@@ -1,6 +1,5 @@
 // Package bimultimap is a thread-safe bidirectional MultiMap. It associates a key with multiple
 // values and each value with its corresponding keys.
-// TODO go 1.18 and generics
 package bimultimap
 
 import (
