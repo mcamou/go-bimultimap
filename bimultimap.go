@@ -8,53 +8,53 @@ import (
 )
 
 // BiMultiMap is a thread-safe bidirectional multimap where neither the keys nor the values need to be unique
-type BiMultiMap struct {
-	forward map[interface{}][]interface{}
-	inverse map[interface{}][]interface{}
+type BiMultiMap[K comparable, V comparable] struct {
+	forward map[K][]V
+	inverse map[V][]K
 	mutex   sync.RWMutex
 }
 
 // New creates a new, empty biMultiMap
-func New() *BiMultiMap {
-	return &BiMultiMap{
-		forward: make(map[interface{}][]interface{}),
-		inverse: make(map[interface{}][]interface{}),
+func New[K comparable, V comparable]() *BiMultiMap[K, V] {
+	return &BiMultiMap[K, V]{
+		forward: make(map[K][]V),
+		inverse: make(map[V][]K),
 	}
 }
 
 // LookupKey gets the values associated with a key, or an empty slice if the key does not exist
-func (m *BiMultiMap) LookupKey(key interface{}) []interface{} {
+func (m *BiMultiMap[K, V]) LookupKey(key K) []V {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	values, found := m.forward[key]
 	if !found {
-		return make([]interface{}, 0)
+		return make([]V, 0)
 	}
 	return values
 }
 
 // LookupValue gets the keys associated with a value, or an empty slice if the value does not exist
-func (m *BiMultiMap) LookupValue(value interface{}) []interface{} {
+func (m *BiMultiMap[K, V]) LookupValue(value V) []K {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	keys, found := m.inverse[value]
 
 	if !found {
-		return make([]interface{}, 0)
+		return make([]K, 0)
 	}
 	return keys
 }
 
 // Add adds a key/value pair
-func (m *BiMultiMap) Add(key interface{}, value interface{}) {
+func (m *BiMultiMap[K, V]) Add(key K, value V) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	values, found := m.forward[key]
 	if !found {
-		values = make([]interface{}, 0, 1)
+		values = make([]V, 0, 1)
 	}
 
 	// Value already exists for that key - early exit
@@ -69,14 +69,14 @@ func (m *BiMultiMap) Add(key interface{}, value interface{}) {
 
 	keys, found := m.inverse[value]
 	if !found {
-		keys = make([]interface{}, 0, 1)
+		keys = make([]K, 0, 1)
 	}
 	keys = append(keys, key)
 	m.inverse[value] = keys
 }
 
 // KeyExists returns true if a key exists in the map
-func (m *BiMultiMap) KeyExists(key interface{}) bool {
+func (m *BiMultiMap[K, V]) KeyExists(key K) bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -85,7 +85,7 @@ func (m *BiMultiMap) KeyExists(key interface{}) bool {
 }
 
 // ValueExists returns true if a value exists in the map
-func (m *BiMultiMap) ValueExists(value interface{}) bool {
+func (m *BiMultiMap[K, V]) ValueExists(value V) bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -94,13 +94,13 @@ func (m *BiMultiMap) ValueExists(value interface{}) bool {
 }
 
 // DeleteKey deletes a key from the map and returns its associated values
-func (m *BiMultiMap) DeleteKey(key interface{}) []interface{} {
+func (m *BiMultiMap[K, V]) DeleteKey(key K) []V {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	values, found := m.forward[key]
 	if !found {
-		return make([]interface{}, 0)
+		return make([]V, 0)
 	}
 
 	delete(m.forward, key)
@@ -114,13 +114,13 @@ func (m *BiMultiMap) DeleteKey(key interface{}) []interface{} {
 }
 
 // DeleteValue deletes a value from the map and returns its associated keys
-func (m *BiMultiMap) DeleteValue(value interface{}) []interface{} {
+func (m *BiMultiMap[K, V]) DeleteValue(value V) []K {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	keys, found := m.inverse[value]
 	if !found {
-		return make([]interface{}, 0)
+		return make([]K, 0)
 	}
 
 	delete(m.inverse, value)
@@ -134,7 +134,7 @@ func (m *BiMultiMap) DeleteValue(value interface{}) []interface{} {
 }
 
 // DeleteKeyValue deletes a single key/value pair
-func (m *BiMultiMap) DeleteKeyValue(key interface{}, value interface{}) {
+func (m *BiMultiMap[K, V]) DeleteKeyValue(key K, value V) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -158,9 +158,9 @@ func (m *BiMultiMap) DeleteKeyValue(key interface{}, value interface{}) {
 	}
 }
 
-// Merge merges two BiMultiMaps: returns a new BiMultiMap consisting of all the key/value pairs in
+// Merge merges two BiMultiMap[K, V]s: returns a new BiMultiMap consisting of all the key/value pairs in
 // this one and all key/value pairs in the other one
-func (m *BiMultiMap) Merge(other *BiMultiMap) *BiMultiMap {
+func (m *BiMultiMap[K, V]) Merge(other *BiMultiMap[K, V]) *BiMultiMap[K, V] {
 	m.mutex.RLock()
 	other.mutex.RLock()
 	defer func() {
@@ -168,7 +168,7 @@ func (m *BiMultiMap) Merge(other *BiMultiMap) *BiMultiMap {
 		m.mutex.RUnlock()
 	}()
 
-	res := New()
+	res := New[K, V]()
 
 	for _, k := range m.Keys() {
 		for _, v := range m.LookupKey(k) {
@@ -185,21 +185,21 @@ func (m *BiMultiMap) Merge(other *BiMultiMap) *BiMultiMap {
 	return res
 }
 
-// Clear clears all entries in the BiMultiMap
-func (m *BiMultiMap) Clear() {
+// Clear clears all entries in the BiMultiMap[K, V]
+func (m *BiMultiMap[K, V]) Clear() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.forward = make(map[interface{}][]interface{})
-	m.inverse = make(map[interface{}][]interface{})
+	m.forward = make(map[K][]V)
+	m.inverse = make(map[V][]K)
 }
 
 // Keys returns an unordered slice containing all of the map's keys
-func (m *BiMultiMap) Keys() []interface{} {
+func (m *BiMultiMap[K, V]) Keys() []K {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	keys := make([]interface{}, 0, len(m.forward))
+	keys := make([]K, 0, len(m.forward))
 	for k := range m.forward {
 		keys = append(keys, k)
 	}
@@ -207,11 +207,11 @@ func (m *BiMultiMap) Keys() []interface{} {
 }
 
 // Values returns an unordered slice containing all of the map's values
-func (m *BiMultiMap) Values() []interface{} {
+func (m *BiMultiMap[K, V]) Values() []V {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	values := make([]interface{}, 0, len(m.inverse))
+	values := make([]V, 0, len(m.inverse))
 	for v := range m.inverse {
 		values = append(values, v)
 	}
@@ -219,8 +219,8 @@ func (m *BiMultiMap) Values() []interface{} {
 }
 
 // Helper function: delete an element from a slice if it exists
-func deleteElement(slice []interface{}, element interface{}) []interface{} {
-	newSlice := make([]interface{}, 0, len(slice)-1)
+func deleteElement[T comparable](slice []T, element T) []T {
+	newSlice := make([]T, 0, len(slice)-1)
 
 	for _, val := range slice {
 		if val != element {
