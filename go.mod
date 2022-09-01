@@ -1,4 +1,4 @@
-module github.com/mcamou/bimultimap
+module github.com/mcamou/go-bimultimap
 
 go 1.17
 
