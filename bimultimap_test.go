@@ -1,6 +1,7 @@
 package bimultimap
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,8 +118,8 @@ func TestBiMultiMapKeysValues(t *testing.T) {
 	sut := biMultiMapWithMultipleKeysValues()
 	sut.Add("key3", "value3")
 
-	keys := sut.Keys()
-	values := sut.Values()
+	keys := slices.Collect(sut.Keys())
+	values := slices.Collect(sut.Values())
 
 	assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, keys, "Keys() should return a slice containing the keys")
 	assert.ElementsMatch(t, []string{"value1", "value2", "value3"}, values, "Values() should return a slice containing the keys")
@@ -128,8 +129,8 @@ func TestBiMultiMapClear(t *testing.T) {
 	sut := biMultiMapWithMultipleKeysValues()
 	sut.Clear()
 
-	assert.Equal(t, []string{}, sut.Keys())
-	assert.Equal(t, []string{}, sut.Values())
+	assert.Equal(t, len(slices.Collect(sut.Keys())), 0)
+	assert.Equal(t, len(slices.Collect(sut.Values())), 0)
 }
 
 func TestBiMultiMapMerge(t *testing.T) {
@@ -144,12 +145,12 @@ func TestBiMultiMapMerge(t *testing.T) {
 
 	sut := map1.Merge(map2)
 
-	assert.ElementsMatch(t, []string{"key1", "key2", "key3", "key4"}, sut.Keys())
+	assert.ElementsMatch(t, []string{"key1", "key2", "key3", "key4"}, slices.Collect(sut.Keys()))
 	assert.ElementsMatch(t, []string{"value1", "value2", "value3"}, sut.LookupKey("key1"))
 	assert.ElementsMatch(t, []string{"value1", "value3"}, sut.LookupKey("key3"))
 	assert.ElementsMatch(t, []string{"value4"}, sut.LookupKey("key4"))
 
-	assert.ElementsMatch(t, []string{"value1", "value2", "value3", "value4"}, sut.Values())
+	assert.ElementsMatch(t, []string{"value1", "value2", "value3", "value4"}, slices.Collect(sut.Values()))
 	assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, sut.LookupValue("value1"))
 	assert.ElementsMatch(t, []string{"key1", "key3"}, sut.LookupValue("value3"))
 	assert.ElementsMatch(t, []string{"key4"}, sut.LookupValue("value4"))

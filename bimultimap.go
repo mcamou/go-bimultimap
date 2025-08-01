@@ -3,6 +3,9 @@
 package bimultimap
 
 import (
+	"iter"
+	"maps"
+	"slices"
 	"sync"
 )
 
@@ -39,7 +42,6 @@ func (m *BiMultiMap[K, V]) LookupValue(value V) []K {
 	defer m.mutex.RUnlock()
 
 	keys, found := m.inverse[value]
-
 	if !found {
 		return make([]K, 0)
 	}
@@ -57,10 +59,8 @@ func (m *BiMultiMap[K, V]) Add(key K, value V) {
 	}
 
 	// Value already exists for that key - early exit
-	for _, v := range values {
-		if v == value {
-			return
-		}
+	if slices.Contains(values, value) {
+		return
 	}
 
 	values = append(values, value)
@@ -105,8 +105,7 @@ func (m *BiMultiMap[K, V]) DeleteKey(key K) []V {
 	delete(m.forward, key)
 
 	for _, v := range values {
-		newKeys := deleteElement(m.inverse[v], key)
-		m.inverse[v] = newKeys
+		m.inverse[v] = deleteItem(m.inverse[v], key)
 	}
 
 	return values
@@ -125,8 +124,7 @@ func (m *BiMultiMap[K, V]) DeleteValue(value V) []K {
 	delete(m.inverse, value)
 
 	for _, k := range keys {
-		newVals := deleteElement(m.forward[k], value)
-		m.forward[k] = newVals
+		m.forward[k] = deleteItem(m.forward[k], value)
 	}
 
 	return keys
@@ -141,17 +139,13 @@ func (m *BiMultiMap[K, V]) DeleteKeyValue(key K, value V) {
 	_, foundKey := m.inverse[value]
 
 	if foundKey && foundValue {
-		newVals := deleteElement(m.forward[key], value)
-		if len(newVals) > 0 {
-			m.forward[key] = newVals
-		} else {
+		m.forward[key] = deleteItem(m.forward[key], value)
+		if len(m.forward[key]) == 0 {
 			delete(m.forward, key)
 		}
 
-		newKeys := deleteElement(m.inverse[value], key)
-		if len(newKeys) > 0 {
-			m.inverse[value] = newKeys
-		} else {
+		m.inverse[value] = deleteItem(m.inverse[value], key)
+		if len(m.inverse[value]) == 0 {
 			delete(m.inverse, value)
 		}
 	}
@@ -169,13 +163,13 @@ func (m *BiMultiMap[K, V]) Merge(other *BiMultiMap[K, V]) *BiMultiMap[K, V] {
 
 	res := New[K, V]()
 
-	for _, k := range m.Keys() {
+	for k := range m.Keys() {
 		for _, v := range m.LookupKey(k) {
 			res.Add(k, v)
 		}
 	}
 
-	for _, k := range other.Keys() {
+	for k := range other.Keys() {
 		for _, v := range other.LookupKey(k) {
 			res.Add(k, v)
 		}
@@ -193,39 +187,25 @@ func (m *BiMultiMap[K, V]) Clear() {
 	m.inverse = make(map[V][]K)
 }
 
-// Keys returns an unordered slice containing all of the map's keys
-func (m *BiMultiMap[K, V]) Keys() []K {
+// Keys returns a Seq containing all of the map's keys
+func (m *BiMultiMap[K, V]) Keys() iter.Seq[K] {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	keys := make([]K, 0, len(m.forward))
-	for k := range m.forward {
-		keys = append(keys, k)
-	}
-	return keys
+	return maps.Keys(m.forward)
 }
 
 // Values returns an unordered slice containing all of the map's values
-func (m *BiMultiMap[K, V]) Values() []V {
+func (m *BiMultiMap[K, V]) Values() iter.Seq[V] {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	values := make([]V, 0, len(m.inverse))
-	for v := range m.inverse {
-		values = append(values, v)
-	}
-	return values
+	return maps.Keys(m.inverse)
 }
 
-// Helper function: delete an element from a slice if it exists
-func deleteElement[T comparable](slice []T, element T) []T {
-	newSlice := make([]T, 0, len(slice)-1)
-
-	for _, val := range slice {
-		if val != element {
-			newSlice = append(newSlice, val)
-		}
-	}
-
-	return newSlice
+// Helper function: delete an element from a slice if it exists. The original slice is unusable afterwards!
+func deleteItem[T comparable](slice []T, item T) []T {
+	return slices.DeleteFunc(slice, func(it T) bool {
+		return item == it
+	})
 }
